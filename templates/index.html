@@ -24,12 +24,13 @@
     <button id="send-btn" type="submit">Send</button>
   </form>
 
-  <script>
+    <script>
     const chat = document.getElementById("chat");
     const form = document.getElementById("chat-form");
     const input = document.getElementById("user-input");
     const sendBtn = document.getElementById("send-btn");
 
+    const ERROR_MARKER = "[[ERROR]]";
     const history = [];
 
     function addMessage(text, role) {
@@ -38,6 +39,7 @@
       div.textContent = text;
       chat.appendChild(div);
       chat.scrollTop = chat.scrollHeight;
+      return div;
     }
 
     form.addEventListener("submit", async (event) => {
@@ -50,30 +52,46 @@
       input.value = "";
       sendBtn.disabled = true;
 
+      const bubble = addMessage("…", "assistant");
+      let reply = "";
+
       try {
-        const res = await fetch("/api/chat", {
+        const res = await fetch("/api/chat/stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ messages: history }),
         });
-        const data = await res.json();
 
         if (!res.ok) {
-          history.pop();
-          addMessage(data.error || "Something went wrong.", "error");
-        } else {
-          history.push({ role: "assistant", content: data.reply });
-          addMessage(data.reply, "assistant");
-          console.log("Tokens:", data.usage);
+          const data = await res.json();
+          throw new Error(data.error || "Something went wrong.");
         }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          reply += decoder.decode(value, { stream: true });
+          bubble.textContent = reply;
+          chat.scrollTop = chat.scrollHeight;
+        }
+
+        if (reply.includes(ERROR_MARKER)) {
+          throw new Error(reply.split(ERROR_MARKER)[1]);
+        }
+
+        history.push({ role: "assistant", content: reply });
       } catch (err) {
         history.pop();
-        addMessage("Can't reach the server. Is app.py running?", "error");
+        bubble.className = "msg error";
+        bubble.textContent = err instanceof TypeError
+          ? "Can't reach the server. Is app.py running?"
+          : err.message;
       } finally {
         sendBtn.disabled = false;
         input.focus();
       }
     });
   </script>
-</body>
-</html>

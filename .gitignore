@@ -1,0 +1,13 @@
+# Secrets: never upload
+.env
+
+# Virtual environment (yours is named env)
+env/
+venv/
+
+# Python's auto-generated cache files
+__pycache__/
+*.pyc
+
+# Virtual environment config file
+pyvenv.cfg

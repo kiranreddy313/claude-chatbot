@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Claude Chatbot</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; background: #f5f5f5; }
+    #chat { background: white; border-radius: 8px; padding: 16px; height: 450px; overflow-y: auto; }
+    .msg { margin: 8px 0; padding: 10px 14px; border-radius: 12px; max-width: 80%; white-space: pre-wrap; }
+    .user { background: #2563eb; color: white; margin-left: auto; }
+    .assistant { background: #e5e7eb; }
+    .error { background: #fee2e2; color: #991b1b; }
+    form { display: flex; gap: 8px; margin-top: 12px; }
+    input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+    button { padding: 10px 18px; border: none; border-radius: 6px; background: #2563eb; color: white; font-size: 16px; cursor: pointer; }
+    button:disabled { background: #9ca3af; }
+  </style>
+</head>
+<body>
+  <h1>My Claude Chatbot</h1>
+  <div id="chat"></div>
+  <form id="chat-form">
+    <input id="user-input" type="text" placeholder="Type a message..." autocomplete="off">
+    <button id="send-btn" type="submit">Send</button>
+  </form>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const form = document.getElementById("chat-form");
+    const input = document.getElementById("user-input");
+    const sendBtn = document.getElementById("send-btn");
+
+    const history = [];
+
+    function addMessage(text, role) {
+      const div = document.createElement("div");
+      div.className = "msg " + role;
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      addMessage(text, "user");
+      history.push({ role: "user", content: text });
+      input.value = "";
+      sendBtn.disabled = true;
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: history }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          history.pop();
+          addMessage(data.error || "Something went wrong.", "error");
+        } else {
+          history.push({ role: "assistant", content: data.reply });
+          addMessage(data.reply, "assistant");
+          console.log("Tokens:", data.usage);
+        }
+      } catch (err) {
+        history.pop();
+        addMessage("Can't reach the server. Is app.py running?", "error");
+      } finally {
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    });
+  </script>
+</body>
+</html>
